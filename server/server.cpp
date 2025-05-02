@@ -76,12 +76,14 @@ int main() {
 
     if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
         std::cerr << "Bind failed." << std::endl;
+        close(server_socket);
         return 1;
     }
 
     // Step 3: Listen for connections
     if (listen(server_socket, 5) < 0) {
         std::cerr << "Listen failed." << std::endl;
+        close(server_socket);
         return 1;
     }
 
@@ -94,24 +96,26 @@ int main() {
         int client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_len);
 
         if (client_socket < 0) {
-            std::cerr << "Failed to accept client." << std::endl;
-            continue;
+            std::cerr << "Error accepting client connection." << std::endl;
+            continue; // Continue to accept other clients
         }
 
-        // Log new connection
-        std::cout << "New client connected: " << client_socket 
-                  << " (" << inet_ntoa(client_address.sin_addr) << ")" << std::endl;
+        // Print client information
+        std::cout << "New client connected: " << inet_ntoa(client_address.sin_addr) 
+                  << ":" << ntohs(client_address.sin_port) << std::endl;
 
+        // Add client to the list
         {
             std::lock_guard<std::mutex> lock(clients_mutex);
             clients.push_back(client_socket);
         }
 
-        // Create a new thread for this client
+        // Handle client in a separate thread
         std::thread client_thread(handleClient, client_socket);
-        client_thread.detach(); // Run independently
+        client_thread.detach(); // Detach the thread to allow independent execution
     }
 
+    // Close the server socket (unreachable in this loop, but good practice)
     close(server_socket);
     return 0;
 }
